@@ -1,3 +1,5 @@
+// ignore_for_file: depend_on_referenced_packages
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -5,6 +7,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 enum FloodRiskLevel { safe, moderate, high }
 
@@ -22,11 +26,8 @@ class _AlternateRoutesPageState extends State<AlternateRoutesPage> {
   StreamSubscription<MapEvent>? _mapEventSub;
   bool _mapReady = false;
 
-  // IMPORTANT: Replace with your actual API keys
-  // ignore: constant_identifier_names
-  static const String ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImM3ODI1ZTMwZTMzZDQ4MzNiOTk0NTc1MTlhODc2ZGYzIiwiaCI6Im11cm11cjY0In0=";
-
-  static const String OPENWEATHER_API_KEY = "c0c37a7969052eb7cc9e7fe020a96981";
+  static final String ORS_API_KEY = dotenv.env['ORS_API_KEY']!;
+  static final String OPENWEATHER_API_KEY = dotenv.env['OPENWEATHER_API_KEY']!;
 
   bool _loading = false;
   List<RouteOption> _allRoutes = [];
@@ -74,18 +75,23 @@ class _AlternateRoutesPageState extends State<AlternateRoutesPage> {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       final uri = Uri.parse(
-          "https://nominatim.openstreetmap.org/search?q=${Uri.encodeQueryComponent(q)}&format=json&addressdetails=1&limit=6");
+        "https://nominatim.openstreetmap.org/search?q=${Uri.encodeQueryComponent(q)}&format=json&addressdetails=1&limit=6",
+      );
       try {
-        final res =
-            await http.get(uri, headers: {'User-Agent': 'com.example.floodapp'});
+        final res = await http.get(
+          uri,
+          headers: {'User-Agent': 'com.example.floodapp'},
+        );
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body) as List;
           final places = data
-              .map((e) => NominatimPlace(
-                    displayName: e['display_name'] ?? "",
-                    lat: double.parse(e['lat']),
-                    lon: double.parse(e['lon']),
-                  ))
+              .map(
+                (e) => NominatimPlace(
+                  displayName: e['display_name'] ?? "",
+                  lat: double.parse(e['lat']),
+                  lon: double.parse(e['lon']),
+                ),
+              )
               .toList();
           _placeCache[q] = places;
           completer.complete(places);
@@ -105,12 +111,16 @@ class _AlternateRoutesPageState extends State<AlternateRoutesPage> {
     return null;
   }
 
-  Future<List<RouteOption>> _fetchRoutes(LatLng from, LatLng to,
-      {int alternatives = 3}) async {
+  Future<List<RouteOption>> _fetchRoutes(
+    LatLng from,
+    LatLng to, {
+    int alternatives = 3,
+  }) async {
     final url = Uri.parse(
-        "https://api.openrouteservice.org/v2/directions/driving-car?api_key=$ORS_API_KEY"
-        "&start=${from.longitude},${from.latitude}"
-        "&end=${to.longitude},${to.latitude}&alternatives=true");
+      "https://api.openrouteservice.org/v2/directions/driving-car?api_key=$ORS_API_KEY"
+      "&start=${from.longitude},${from.latitude}"
+      "&end=${to.longitude},${to.latitude}&alternatives=true",
+    );
 
     final res = await http.get(url);
     if (res.statusCode != 200) {
@@ -123,26 +133,32 @@ class _AlternateRoutesPageState extends State<AlternateRoutesPage> {
 
     for (var f in features) {
       final coords = (f['geometry']['coordinates'] as List)
-          .map((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
+          .map(
+            (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+          )
           .toList();
       final summary = f['properties']['summary'];
       final dist = (summary['distance'] as num).toDouble();
       final dur = ((summary['duration'] as num).toDouble() / 60).round();
-      results.add(RouteOption(
-        id: UniqueKey().toString(),
-        name: "Route",
-        distanceMeters: dist,
-        durationMinutes: dur,
-        points: coords,
-        risk: FloodRiskLevel.safe,
-      ));
+      results.add(
+        RouteOption(
+          id: UniqueKey().toString(),
+          name: "Route",
+          distanceMeters: dist,
+          durationMinutes: dur,
+          points: coords,
+          risk: FloodRiskLevel.safe,
+        ),
+      );
       if (results.length >= alternatives) break;
     }
     return results;
   }
 
-  Future<FloodRiskLevel> _assessRouteFloodRisk(RouteOption route,
-      {double sampleMeters = 1000}) async {
+  Future<FloodRiskLevel> _assessRouteFloodRisk(
+    RouteOption route, {
+    double sampleMeters = 1000,
+  }) async {
     final sampled = _sampleRouteByDistance(route.points, sampleMeters);
     bool sawModerate = false;
     for (var p in sampled) {
@@ -174,15 +190,17 @@ class _AlternateRoutesPageState extends State<AlternateRoutesPage> {
 
     if (_owmCallsThisWindow >= _OWM_MAX_CALLS_PER_MINUTE) {
       _owmCache[key] = _CachedFlood(
-          level: FloodRiskLevel.safe,
-          expires: now.add(const Duration(minutes: 5)));
+        level: FloodRiskLevel.safe,
+        expires: now.add(const Duration(minutes: 5)),
+      );
       setState(() => _statusMessage = "Rate limit hit; using cached/fallback.");
       return FloodRiskLevel.safe;
     }
 
     _owmCallsThisWindow++;
     final url = Uri.parse(
-        "https://api.openweathermap.org/data/3.0/onecall?lat=${p.latitude}&lon=${p.longitude}&exclude=minutely,hourly&appid=$OPENWEATHER_API_KEY&units=metric");
+      "https://api.openweathermap.org/data/3.0/onecall?lat=${p.latitude}&lon=${p.longitude}&exclude=minutely,hourly&appid=$OPENWEATHER_API_KEY&units=metric",
+    );
 
     try {
       final res = await http.get(url);
@@ -199,16 +217,18 @@ class _AlternateRoutesPageState extends State<AlternateRoutesPage> {
           }
         }
         _owmCache[key] = _CachedFlood(
-            level: level,
-            expires: now.add(const Duration(minutes: _OWM_CACHE_TTL_MIN)));
+          level: level,
+          expires: now.add(const Duration(minutes: _OWM_CACHE_TTL_MIN)),
+        );
         return level;
       }
     } catch (e) {
       debugPrint("OpenWeather error: $e");
     }
     _owmCache[key] = _CachedFlood(
-        level: FloodRiskLevel.safe,
-        expires: now.add(const Duration(minutes: 5)));
+      level: FloodRiskLevel.safe,
+      expires: now.add(const Duration(minutes: 5)),
+    );
     return FloodRiskLevel.safe;
   }
 
@@ -308,14 +328,17 @@ class _AlternateRoutesPageState extends State<AlternateRoutesPage> {
         builder: (c) => AlertDialog(
           title: const Text("Show HIGH-RISK routes?"),
           content: const Text(
-              "These routes may be unsafe due to flood warnings. Show anyway?"),
+            "These routes may be unsafe due to flood warnings. Show anyway?",
+          ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.of(c).pop(false),
-                child: const Text("No")),
+              onPressed: () => Navigator.of(c).pop(false),
+              child: const Text("No"),
+            ),
             ElevatedButton(
-                onPressed: () => Navigator.of(c).pop(true),
-                child: const Text("Yes")),
+              onPressed: () => Navigator.of(c).pop(true),
+              child: const Text("Yes"),
+            ),
           ],
         ),
       );
@@ -331,114 +354,124 @@ class _AlternateRoutesPageState extends State<AlternateRoutesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: const Text("Alternate Routes"),
-          backgroundColor: const Color.fromARGB(255, 6, 11, 74)),
+        title: const Text("Alternate Routes"),
+        backgroundColor: const Color.fromARGB(255, 6, 11, 74),
+      ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Column(children: [
-              // "From" location input
-              Builder(
-                builder: (context) {
-                  return TypeAheadField<NominatimPlace>(
-                    textFieldConfiguration: TextFieldConfiguration(
-                      controller: _fromCtrl,
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.my_location),
-                        labelText: "From",
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
+            child: Column(
+              children: [
+                // "From" location input
+                Builder(
+                  builder: (context) {
+                    return TypeAheadField<NominatimPlace>(
+                      textFieldConfiguration: TextFieldConfiguration(
+                        controller: _fromCtrl,
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.my_location),
+                          labelText: "From",
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                       ),
-                    ),
-                    suggestionsCallback: (pattern) => _searchPlaces(pattern),
-                    itemBuilder: (context, suggestion) =>
-                        ListTile(title: Text(suggestion.displayName)),
-                    onSuggestionSelected: (suggestion) {
-                      _fromCtrl.text = suggestion.displayName;
-                      if (_mapReady) {
-                        _mapController.move(
-                          LatLng(suggestion.lat, suggestion.lon),
-                          13,
-                        );
-                      } else {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          try {
-                            _mapController.move(
-                              LatLng(suggestion.lat, suggestion.lon),
-                              13,
-                            );
-                          } catch (_) {}
-                        });
-                      }
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              // "To" location input
-              Builder(
-                builder: (context) {
-                  return TypeAheadField<NominatimPlace>(
-                    textFieldConfiguration: TextFieldConfiguration(
-                      controller: _toCtrl,
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.location_on),
-                        labelText: "To",
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                    suggestionsCallback: (pattern) => _searchPlaces(pattern),
-                    itemBuilder: (context, suggestion) =>
-                        ListTile(title: Text(suggestion.displayName)),
-                    onSuggestionSelected: (suggestion) {
-                      _toCtrl.text = suggestion.displayName;
-                      if (_mapReady) {
-                        _mapController.move(
-                          LatLng(suggestion.lat, suggestion.lon),
-                          13,
-                        );
-                      } else {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          try {
-                            _mapController.move(
-                              LatLng(suggestion.lat, suggestion.lon),
-                              13,
-                            );
-                          } catch (_) {}
-                        });
-                      }
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    backgroundColor: Colors.blue[800],
-                  ),
-                  onPressed: _loading ? null : _onCheckRoutesPressed,
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2))
-                      : const Icon(Icons.search),
-                  label: Text(_loading ? "Analyzing..." : "Find Alternate Routes"),
+                      suggestionsCallback: (pattern) => _searchPlaces(pattern),
+                      itemBuilder: (context, suggestion) =>
+                          ListTile(title: Text(suggestion.displayName)),
+                      onSuggestionSelected: (suggestion) {
+                        _fromCtrl.text = suggestion.displayName;
+                        if (_mapReady) {
+                          _mapController.move(
+                            LatLng(suggestion.lat, suggestion.lon),
+                            13,
+                          );
+                        } else {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            try {
+                              _mapController.move(
+                                LatLng(suggestion.lat, suggestion.lon),
+                                13,
+                              );
+                            } catch (_) {}
+                          });
+                        }
+                      },
+                    );
+                  },
                 ),
-              ),
-              SwitchListTile(
-                title: const Text("Show HIGH-RISK routes"),
-                subtitle: const Text("Hidden by default for safety"),
-                value: _showHighRiskRoutes,
-                onChanged: _confirmToggleHighRisk,
-              ),
-            ]),
+                const SizedBox(height: 8),
+                // "To" location input
+                Builder(
+                  builder: (context) {
+                    return TypeAheadField<NominatimPlace>(
+                      textFieldConfiguration: TextFieldConfiguration(
+                        controller: _toCtrl,
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.location_on),
+                          labelText: "To",
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                      suggestionsCallback: (pattern) => _searchPlaces(pattern),
+                      itemBuilder: (context, suggestion) =>
+                          ListTile(title: Text(suggestion.displayName)),
+                      onSuggestionSelected: (suggestion) {
+                        _toCtrl.text = suggestion.displayName;
+                        if (_mapReady) {
+                          _mapController.move(
+                            LatLng(suggestion.lat, suggestion.lon),
+                            13,
+                          );
+                        } else {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            try {
+                              _mapController.move(
+                                LatLng(suggestion.lat, suggestion.lon),
+                                13,
+                              );
+                            } catch (_) {}
+                          });
+                        }
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      backgroundColor: Colors.blue[800],
+                    ),
+                    onPressed: _loading ? null : _onCheckRoutesPressed,
+                    icon: _loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.search),
+                    label: Text(
+                      _loading ? "Analyzing..." : "Find Alternate Routes",
+                    ),
+                  ),
+                ),
+                SwitchListTile(
+                  title: const Text("Show HIGH-RISK routes"),
+                  subtitle: const Text("Hidden by default for safety"),
+                  value: _showHighRiskRoutes,
+                  onChanged: _confirmToggleHighRisk,
+                ),
+              ],
+            ),
           ),
           Container(
             width: double.infinity,
@@ -450,107 +483,122 @@ class _AlternateRoutesPageState extends State<AlternateRoutesPage> {
             child: _displayRoutes.isEmpty && !_loading
                 ? const Center(
                     child: Text(
-                        "No routes yet. Enter locations and tap ‘Find Alternate Routes.’"))
-                : Column(children: [
-                    Flexible(
-                      flex: 4,
-                      child: ListView.builder(
-                        itemCount: _displayRoutes.length,
-                        itemBuilder: (context, idx) {
-                          final r = _displayRoutes[idx];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            child: ListTile(
-                              leading: Icon(
-                                r.risk == FloodRiskLevel.safe
-                                    ? Icons.check_circle
-                                    : (r.risk == FloodRiskLevel.moderate
-                                        ? Icons.warning_amber_rounded
-                                        : Icons.dangerous),
-                                color: r.risk == FloodRiskLevel.safe
-                                    ? Colors.green
-                                    : (r.risk == FloodRiskLevel.moderate
-                                        ? Colors.orange
-                                        : Colors.red),
+                      "No routes yet. Enter locations and tap ‘Find Alternate Routes.’",
+                    ),
+                  )
+                : Column(
+                    children: [
+                      Flexible(
+                        flex: 4,
+                        child: ListView.builder(
+                          itemCount: _displayRoutes.length,
+                          itemBuilder: (context, idx) {
+                            final r = _displayRoutes[idx];
+                            return Card(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
                               ),
-                              title: Text("Route ${idx + 1}"),
-                              subtitle: Text(
-                                  "${(r.distanceMeters / 1000).toStringAsFixed(1)} km • ${r.durationMinutes} min"),
-                              trailing: Text(
-                                r.risk == FloodRiskLevel.safe
-                                    ? "Safe"
-                                    : (r.risk == FloodRiskLevel.moderate
-                                        ? "Caution"
-                                        : "High Risk"),
-                                style: TextStyle(
+                              child: ListTile(
+                                leading: Icon(
+                                  r.risk == FloodRiskLevel.safe
+                                      ? Icons.check_circle
+                                      : (r.risk == FloodRiskLevel.moderate
+                                            ? Icons.warning_amber_rounded
+                                            : Icons.dangerous),
                                   color: r.risk == FloodRiskLevel.safe
                                       ? Colors.green
                                       : (r.risk == FloodRiskLevel.moderate
-                                          ? Colors.orange
-                                          : Colors.red),
-                                  fontWeight: FontWeight.bold,
+                                            ? Colors.orange
+                                            : Colors.red),
                                 ),
-                              ),
-                              onTap: () {
-                                final bounds = LatLngBounds.fromPoints(r.points);
-                                if (_mapReady) {
-                                  _mapController.fitBounds(
-                                    bounds,
-                                    options: const FitBoundsOptions(
-                                        padding: EdgeInsets.all(20)),
+                                title: Text("Route ${idx + 1}"),
+                                subtitle: Text(
+                                  "${(r.distanceMeters / 1000).toStringAsFixed(1)} km • ${r.durationMinutes} min",
+                                ),
+                                trailing: Text(
+                                  r.risk == FloodRiskLevel.safe
+                                      ? "Safe"
+                                      : (r.risk == FloodRiskLevel.moderate
+                                            ? "Caution"
+                                            : "High Risk"),
+                                  style: TextStyle(
+                                    color: r.risk == FloodRiskLevel.safe
+                                        ? Colors.green
+                                        : (r.risk == FloodRiskLevel.moderate
+                                              ? Colors.orange
+                                              : Colors.red),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                onTap: () {
+                                  final bounds = LatLngBounds.fromPoints(
+                                    r.points,
                                   );
-                                } else {
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                    try {
-                                      _mapController.fitBounds(
-                                        bounds,
-                                        options: const FitBoundsOptions(
-                                            padding: EdgeInsets.all(20)),
-                                      );
-                                    } catch (_) {}
-                                  });
-                                }
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    Flexible(
-                      flex: 5,
-                      child: FlutterMap(
-                        mapController: _mapController,
-                        options: MapOptions(
-                          center: _displayRoutes.isNotEmpty &&
-                                  _displayRoutes.first.points.isNotEmpty
-                              ? _displayRoutes.first.points.first
-                              : LatLng(0, 0),
-                          zoom: 10,
+                                  if (_mapReady) {
+                                    _mapController.fitBounds(
+                                      bounds,
+                                      options: const FitBoundsOptions(
+                                        padding: EdgeInsets.all(20),
+                                      ),
+                                    );
+                                  } else {
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          try {
+                                            _mapController.fitBounds(
+                                              bounds,
+                                              options: const FitBoundsOptions(
+                                                padding: EdgeInsets.all(20),
+                                              ),
+                                            );
+                                          } catch (_) {}
+                                        });
+                                  }
+                                },
+                              ),
+                            );
+                          },
                         ),
-                        children: [
-                          TileLayer(
-                            urlTemplate:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.example.floodapp',
+                      ),
+                      Flexible(
+                        flex: 5,
+                        child: FlutterMap(
+                          mapController: _mapController,
+                          options: MapOptions(
+                            center:
+                                _displayRoutes.isNotEmpty &&
+                                    _displayRoutes.first.points.isNotEmpty
+                                ? _displayRoutes.first.points.first
+                                : LatLng(0, 0),
+                            zoom: 10,
                           ),
-                          PolylineLayer(
-                            polylines: _displayRoutes
-                                .map((r) => Polyline(
+                          children: [
+                            TileLayer(
+                              urlTemplate:
+                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'com.example.floodapp',
+                            ),
+                            PolylineLayer(
+                              polylines: _displayRoutes
+                                  .map(
+                                    (r) => Polyline(
                                       points: r.points,
                                       strokeWidth: 5,
                                       color: r.risk == FloodRiskLevel.safe
                                           ? Colors.green
                                           : (r.risk == FloodRiskLevel.moderate
-                                              ? Colors.orange
-                                              : Colors.red),
-                                    ))
-                                .toList(),
-                          ),
-                        ],
+                                                ? Colors.orange
+                                                : Colors.red),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ]),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -562,8 +610,11 @@ class NominatimPlace {
   final String displayName;
   final double lat;
   final double lon;
-  NominatimPlace(
-      {required this.displayName, required this.lat, required this.lon});
+  NominatimPlace({
+    required this.displayName,
+    required this.lat,
+    required this.lon,
+  });
 }
 
 class RouteOption {
