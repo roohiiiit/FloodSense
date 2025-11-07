@@ -1,0 +1,49 @@
+name: floodsense2
+description: A new Flutter project.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  lottie: ^3.1.0
+
+  # Maps & geolocation
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+  geolocator: ^10.1.0
+
+  # Networking / parsing
+  http: ^1.2.1   # keeping the latest from your current YAML
+  dio: ^5.3.0
+  intl: ^0.19.0
+
+  # Search/autocomplete UI helper
+  flutter_typeahead: ^4.1.1 # keeping the newer version instead of 4.1.1
+  firebase_core: ^3.6.0
+  cloud_firestore: ^5.4.4
+  shared_preferences: ^2.5.3
+  firebase_auth: ^5.1.2
+  image_picker: ^1.1.2
+  firebase_storage: ^12.4.10
+  video_player: ^2.10.0
+  chewie: ^1.12.1
+  supabase_flutter: ^2.9.1
+  geocoding: ^4.0.0
+  flutter_dotenv: ^6.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/loading.json
+    - assets/animated_bg.json

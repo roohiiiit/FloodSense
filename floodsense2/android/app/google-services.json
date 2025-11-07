@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "831134242043",
+    "project_id": "floodsense-d1280",
+    "storage_bucket": "floodsense-d1280.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:831134242043:android:5b84be1471d53034fb4c5e",
+        "android_client_info": {
+          "package_name": "com.example.floodsense2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALgftENtZ11fPzDt-Q1p8SvBrtw_Sp_qE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
