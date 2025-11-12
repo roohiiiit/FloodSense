@@ -19,7 +19,7 @@
 
 1.  **Clone the repo**
     ```bash
-    git clone [https://github.com/roohiiiit/floodsense.git](https://github.com/roohiiiit/floodsense.git)
+    git clone https://github.com/roohiiiit/floodsense.git
     ```
 
 2.  **Navigate to the project directory**
